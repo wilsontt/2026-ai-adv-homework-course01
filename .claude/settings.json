@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm start)",
+      "Bash(npm install)",
+      "Bash(npm install *)",
+      "Bash(npm run dev:server)",
+      "Bash(npm run dev:css)",
+      "Bash(npm run css:build)",
+      "Bash(npm run openapi)",
+      "Bash(node *)",
+      "Bash(ls*)",
+      "Bash(find*)",
+      "Bash(grep*)",
+      "Bash(cat *)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git stash*)",
+      "Bash(mv docs/plans/*.md docs/plans/archive/)",
+      "WebFetch(domain:payment-stage.ecpay.com.tw)",
+      "WebFetch(domain:payment.ecpay.com.tw)"
+    ],
+    "deny": []
+  }
+}

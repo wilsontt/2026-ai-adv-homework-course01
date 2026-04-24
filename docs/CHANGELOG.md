@@ -6,12 +6,13 @@
 
 ### Added
 - 綠界 ECPay AIO 金流整合：`POST /api/orders/:id/payment`（產生付款表單）、`POST /api/orders/:id/payment/query`（主動查詢付款結果）
+- ECPay Server Notify：`POST /api/ecpay/notify`（接收綠界 ReturnURL 回呼，驗 CheckMacValue 更新訂單狀態；同時作為整合測試的 callback 模擬端點）
 - ECPay 服務模組 `src/services/ecpayService.js`：CheckMacValue 產生/驗證、AioCheckOut 參數組合、QueryTradeInfo 查詢
 - orders 表新增 `payment_no` 欄位，支援重複付款嘗試（每次產生唯一 MerchantTradeNo）
-- ECPay 測試 `tests/ecpay.test.js`：含官方 CheckMacValue 測試向量驗證
+- ECPay 測試 `tests/ecpay.test.js`（21 tests）：官方 CheckMacValue 向量驗證、notify 整合測試（以測試向量 HashKey/HashIV 模擬綠界回調，無需真實刷卡）
 - 前端訂單詳情頁「前往付款」→ 綠界付款 → 回導後自動查詢結果
 - 模擬付款端點加入正式環境 guard（`ECPAY_ENV=production` 時回 403）
-- 測試環境啟用 `SimulatePaid=1` 免真刷卡
+- 專案 Claude Code 設定 `.claude/settings.json`（Bash / WebFetch 權限規則）
 
 ### Changed
 - 初版 `docs/` 文件集（README、ARCHITECTURE、DEVELOPMENT、FEATURES、TESTING、CHANGELOG）

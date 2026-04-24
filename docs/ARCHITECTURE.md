@@ -78,6 +78,7 @@
 | `/api/products` | `src/routes/productRoutes.js` | 公開 | 商品列表與詳情（含分頁） |
 | `/api/cart` | `src/routes/cartRoutes.js` | dualAuth（JWT 或 X-Session-Id） | 購物車 CRUD |
 | `/api/orders` | `src/routes/orderRoutes.js` | JWT（`router.use(authMiddleware)`） | 建立訂單、列表、詳情、ECPay 付款（產生表單 / 主動查詢）、模擬付款 |
+| `/api/ecpay` | `src/routes/ecpayRoutes.js` | 無（CheckMacValue 驗簽） | 綠界 Server Notify（ReturnURL） |
 | `/api/admin/products` | `src/routes/adminProductRoutes.js` | JWT + admin 角色 | 後台商品 CRUD |
 | `/api/admin/orders` | `src/routes/adminOrderRoutes.js` | JWT + admin 角色 | 後台訂單列表、詳情 |
 | `/` | `src/routes/pageRoutes.js` | 無（前端自理） | EJS SSR 頁面 |

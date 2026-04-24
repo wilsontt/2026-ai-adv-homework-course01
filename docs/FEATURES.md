@@ -14,7 +14,7 @@
 | 6 | 後台訂單管理（Admin Orders） | ✅ | `tests/adminOrders.test.js` |
 | 7 | EJS 前台 / 後台頁面 | ✅ | —（手動驗證） |
 | 8 | OpenAPI / Swagger 文件 | ✅ | —（`npm run openapi`） |
-| 9 | 綠界 ECPay 金流整合 | ✅ | `tests/ecpay.test.js` |
+| 9 | 綠界 ECPay 金流整合（含 Server Notify） | ✅ | `tests/ecpay.test.js` |
 
 ---
 
@@ -245,6 +245,20 @@
 - 綠界 HTTP 請求失敗 / JSON 解析異常 → 500 `ECPAY_ERROR` / `綠界查詢失敗：<原因>`
 - 成功：200，回 `{ ...order, items }`
 
+### `POST /api/ecpay/notify` — 接收綠界 Server Notify（ReturnURL）
+
+- **不需 JWT**（由 CheckMacValue 驗簽取代）。
+- 接收 `application/x-www-form-urlencoded` 格式。
+- 流程：
+  1. `verifyCheckMacValue(params, hashKey, hashIV)` 驗簽 → 失敗回 `0|CheckMacValue Error`（400）
+  2. `RtnCode !== '1'` → 直接回 `1|OK`（接受但不更新，避免 ECPay 無限重試）
+  3. 以 `MerchantTradeNo[:16]` 對應 `REPLACE(order_no, '-', '')`、`parseInt(MerchantTradeNo[16:])` 對應 `payment_no` 查詢訂單
+  4. 找不到訂單或訂單非 pending → 冪等回 `1|OK`
+  5. `TradeAmt !== order.total_amount` → `0|Amount Mismatch`（400）
+  6. 成功：`UPDATE orders SET status = 'paid'`；回 `1|OK`
+- **用途一**（正式環境）：綠界付款完成後向此端點回呼，自動更新訂單狀態。
+- **用途二**（測試）：整合測試可用已知 HashKey/HashIV 自行產生合法 CheckMacValue，POST 此端點模擬綠界 callback，完整走完付款流程而無需真實刷卡。
+
 ### 前端整合點（`public/js/order-detail.js`）
 
 1. 訂單為 `pending` 時顯示「前往付款」按鈕 → 呼叫 `/payment` → 以回傳的 `action_url` / `params` 動態建表單 submit。
@@ -257,4 +271,3 @@
 
 - **訪客購物車合併**：登入後 `session_id` 綁定的 cart_items 不會自動遷移到 `user_id`。
 - **訂單付款失敗不回滾庫存**：設計上將失敗單視為保留庫存，若要回滾需新增補償 transaction。
-- **綠界 Server Notify（ReturnURL）**：目前未實作 webhook 驗證端點（本地端無法接收）。若要部署至公網，應新增 `POST /api/ecpay/notify` 並以 `verifyCheckMacValue()` 驗簽、回傳 `1|OK`。

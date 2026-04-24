@@ -1,17 +1,20 @@
 const { app, request, registerUser } = require('./setup');
 const {
-  ecpayUrlEncode,
   generateCheckMacValue,
   verifyCheckMacValue,
   buildMerchantTradeNo,
-  buildAioCheckOutParams
 } = require('../src/services/ecpayService');
+
+// 測試用 ECPay 金鑰（綠界官方測試向量）
+const TEST_HASH_KEY = 'pwFHCqoQZGmho4w6';
+const TEST_HASH_IV = 'EkRm7iFT261dpevs';
+const TEST_MERCHANT_ID = '3002607';
 
 // ── CheckMacValue 單元測試（官方測試向量） ──
 
 describe('ECPay CheckMacValue', () => {
-  const hashKey = 'pwFHCqoQZGmho4w6';
-  const hashIV = 'EkRm7iFT261dpevs';
+  const hashKey = TEST_HASH_KEY;
+  const hashIV = TEST_HASH_IV;
 
   it('SHA256 基本測試（AIO 金流）', () => {
     const params = {
@@ -125,12 +128,18 @@ describe('buildMerchantTradeNo', () => {
 });
 
 // ── 付款 API 整合測試 ──
+// notify、payment/query 均需要使用付款表單產生 MerchantTradeNo，故全部置於同一 describe 共用 userToken
 
 describe('ECPay Payment API', () => {
   let userToken;
   let orderId;
 
   beforeAll(async () => {
+    // 設定測試用 ECPay 憑證，ecpayService.getConfig() 於呼叫時讀取 env，可即時生效
+    process.env.ECPAY_HASH_KEY = TEST_HASH_KEY;
+    process.env.ECPAY_HASH_IV = TEST_HASH_IV;
+    process.env.ECPAY_MERCHANT_ID = TEST_MERCHANT_ID;
+
     const { token } = await registerUser();
     userToken = token;
 
@@ -153,6 +162,8 @@ describe('ECPay Payment API', () => {
 
     orderId = orderRes.body.data.id;
   });
+
+  // ── /payment ──
 
   describe('POST /api/orders/:id/payment', () => {
     it('應產生 ECPay 付款表單參數', async () => {
@@ -212,11 +223,13 @@ describe('ECPay Payment API', () => {
     });
   });
 
+  // ── /payment/query ──
+
   describe('POST /api/orders/:id/payment/query', () => {
     let pendingOrderId;
+    let pendingTotalAmount;
 
     beforeAll(async () => {
-      // 建立一筆新的 pending 訂單（找有庫存的商品）
       const prodRes = await request(app).get('/api/products');
       const availableProduct = prodRes.body.data.products.find(p => p.stock > 0);
       if (!availableProduct) throw new Error('No product with stock available for test');
@@ -231,11 +244,12 @@ describe('ECPay Payment API', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send({
           recipientName: '查詢測試',
-          recipientEmail: 'query-test@example.com',
+          recipientEmail: `query-${Date.now()}@example.com`,
           recipientAddress: '台北市查詢路 789 號'
         });
 
       pendingOrderId = orderRes.body.data.id;
+      pendingTotalAmount = orderRes.body.data.total_amount;
     });
 
     it('不存在的訂單應回 404', async () => {
@@ -247,19 +261,211 @@ describe('ECPay Payment API', () => {
       expect(res.body.error).toBe('NOT_FOUND');
     });
 
-    it('已付款訂單應直接回傳（冪等）', async () => {
-      // 先把訂單改成 paid
-      await request(app)
-        .patch(`/api/orders/${pendingOrderId}/pay`)
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ action: 'success' });
-
+    it('尚未發起付款（payment_no=0）應回 400 INVALID_STATUS', async () => {
+      // 此時 pendingOrderId 尚未呼叫過 /payment，payment_no = 0
       const res = await request(app)
         .post(`/api/orders/${pendingOrderId}/payment/query`)
         .set('Authorization', `Bearer ${userToken}`);
 
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('INVALID_STATUS');
+    });
+
+    it('已付款訂單應直接回傳（冪等）— 透過 notify 完成付款', async () => {
+      // 1. 產生付款表單（payment_no 遞增）
+      const payRes = await request(app)
+        .post(`/api/orders/${pendingOrderId}/payment`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      const pendingMerchantTradeNo = payRes.body.data.params.MerchantTradeNo;
+
+      // 2. 模擬綠界 Server Notify（不需真實刷卡）
+      const notifyParams = {
+        MerchantID: TEST_MERCHANT_ID,
+        MerchantTradeNo: pendingMerchantTradeNo,
+        RtnCode: '1',
+        RtnMsg: 'Succeeded',
+        TradeNo: '2026042499990000',
+        TradeAmt: String(pendingTotalAmount),
+        PaymentDate: '2026/04/24 12:00:00',
+        PaymentType: 'Credit_CreditCard',
+        TradeDate: '2026/04/24 11:59:00',
+        SimulatePaid: '0'
+      };
+      notifyParams.CheckMacValue = generateCheckMacValue(
+        notifyParams, TEST_HASH_KEY, TEST_HASH_IV
+      );
+
+      const notifyRes = await request(app)
+        .post('/api/ecpay/notify')
+        .type('form')
+        .send(notifyParams);
+
+      expect(notifyRes.status).toBe(200);
+      expect(notifyRes.text).toBe('1|OK');
+
+      // 3. Query → 訂單已 paid，走冪等路徑直接回傳
+      const queryRes = await request(app)
+        .post(`/api/orders/${pendingOrderId}/payment/query`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(queryRes.status).toBe(200);
+      expect(queryRes.body.data.status).toBe('paid');
+      expect(queryRes.body.error).toBeNull();
+    });
+  });
+
+  // ── Server Notify（/api/ecpay/notify）──
+  // 與 /payment、/payment/query 共用 userToken；各測試需要的訂單在 beforeAll 中建立
+
+  describe('POST /api/ecpay/notify', () => {
+    let notifyOrderId;
+    let notifyTotalAmount;
+    let merchantTradeNo;
+
+    function buildNotifyParams(extraFields = {}) {
+      const base = {
+        MerchantID: TEST_MERCHANT_ID,
+        MerchantTradeNo: merchantTradeNo,
+        RtnCode: '1',
+        RtnMsg: 'Succeeded',
+        TradeNo: '2026042400001234',
+        TradeAmt: String(notifyTotalAmount),
+        PaymentDate: '2026/04/24 12:00:00',
+        PaymentType: 'Credit_CreditCard',
+        TradeDate: '2026/04/24 11:59:00',
+        SimulatePaid: '0',
+        ...extraFields
+      };
+      // CheckMacValue：若呼叫端已自行帶入（測試壞簽名），直接使用；否則自動計算
+      if (!extraFields.CheckMacValue) {
+        base.CheckMacValue = generateCheckMacValue(base, TEST_HASH_KEY, TEST_HASH_IV);
+      }
+      return base;
+    }
+
+    beforeAll(async () => {
+      // 建立專屬於 notify 測試的 pending 訂單
+      const prodRes = await request(app).get('/api/products');
+      const product = prodRes.body.data.products.find(p => p.stock > 0);
+      if (!product) throw new Error('No product with stock for notify test');
+
+      await request(app)
+        .post('/api/cart')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ productId: product.id, quantity: 1 });
+
+      const orderRes = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          recipientName: '通知測試',
+          recipientEmail: `notify-${Date.now()}@example.com`,
+          recipientAddress: '台北市通知路 123 號'
+        });
+
+      notifyOrderId = orderRes.body.data.id;
+      notifyTotalAmount = orderRes.body.data.total_amount;
+
+      // 產生付款表單（payment_no 遞增為 1），取得 MerchantTradeNo
+      const paymentRes = await request(app)
+        .post(`/api/orders/${notifyOrderId}/payment`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      merchantTradeNo = paymentRes.body.data.params.MerchantTradeNo;
+    });
+
+    it('有效 CheckMacValue + RtnCode=1 應將訂單改為 paid 並回 1|OK', async () => {
+      const res = await request(app)
+        .post('/api/ecpay/notify')
+        .type('form')
+        .send(buildNotifyParams());
+
       expect(res.status).toBe(200);
-      expect(res.body.data.status).toBe('paid');
+      expect(res.text).toBe('1|OK');
+
+      // 確認訂單狀態已更新
+      const orderRes = await request(app)
+        .get(`/api/orders/${notifyOrderId}`)
+        .set('Authorization', `Bearer ${userToken}`);
+      expect(orderRes.body.data.status).toBe('paid');
+    });
+
+    it('同一訂單重複 notify 應冪等回 1|OK', async () => {
+      // 訂單已 paid，再次 notify 不應出錯
+      const res = await request(app)
+        .post('/api/ecpay/notify')
+        .type('form')
+        .send(buildNotifyParams());
+
+      expect(res.status).toBe(200);
+      expect(res.text).toBe('1|OK');
+    });
+
+    it('CheckMacValue 錯誤應回 400', async () => {
+      const res = await request(app)
+        .post('/api/ecpay/notify')
+        .type('form')
+        .send(buildNotifyParams({
+          CheckMacValue: 'WRONG_VALUE_1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12345678'
+        }));
+
+      expect(res.status).toBe(400);
+      expect(res.text).toContain('CheckMacValue Error');
+    });
+
+    it('RtnCode 非 1 應接受並回 1|OK（訂單狀態不更新）', async () => {
+      // 建立全新 pending 訂單
+      const prodRes = await request(app).get('/api/products');
+      const product = prodRes.body.data.products.find(p => p.stock > 0);
+
+      await request(app)
+        .post('/api/cart')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ productId: product.id, quantity: 1 });
+
+      const orderRes = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          recipientName: '失敗通知測試',
+          recipientEmail: `rtnfail-${Date.now()}@example.com`,
+          recipientAddress: '台北市失敗路 999 號'
+        });
+
+      const failOrderId = orderRes.body.data.id;
+      const failAmount = orderRes.body.data.total_amount;
+
+      const payRes = await request(app)
+        .post(`/api/orders/${failOrderId}/payment`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      const failMerchantTradeNo = payRes.body.data.params.MerchantTradeNo;
+
+      const notifyBase = {
+        MerchantID: TEST_MERCHANT_ID,
+        MerchantTradeNo: failMerchantTradeNo,
+        RtnCode: '0',
+        RtnMsg: 'Failed',
+        TradeAmt: String(failAmount),
+        TradeDate: '2026/04/24 12:00:00',
+        SimulatePaid: '0'
+      };
+      notifyBase.CheckMacValue = generateCheckMacValue(notifyBase, TEST_HASH_KEY, TEST_HASH_IV);
+
+      const res = await request(app)
+        .post('/api/ecpay/notify')
+        .type('form')
+        .send(notifyBase);
+
+      expect(res.status).toBe(200);
+      expect(res.text).toBe('1|OK');
+
+      // 確認訂單仍為 pending（付款失敗 notify 不改狀態）
+      const checkRes = await request(app)
+        .get(`/api/orders/${failOrderId}`)
+        .set('Authorization', `Bearer ${userToken}`);
+      expect(checkRes.body.data.status).toBe('pending');
     });
   });
 });

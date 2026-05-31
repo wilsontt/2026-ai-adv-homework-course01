@@ -1,21 +1,38 @@
 @import "tailwindcss";
 
 @theme {
-  --color-rose-primary: #C4727F;
-  --color-rose-dark: #A85B67;
-  --color-rose-light: #E8A5AE;
-  --color-apricot: #D4956A;
-  --color-sage: #7EA584;
-  --color-cream: #FBF8F4;
-  --color-blush: #FFF1EC;
-  --color-rose-bg: #FDEAE4;
-  --color-text-primary: #2C2A28;
-  --color-text-secondary: #6B6560;
-  --color-text-muted: #9A948E;
+  /* Core brand — mapped from old names so existing JS still compiles */
+  --color-rose-primary: #B55C52;
+  --color-rose-dark:    #8E4238;
+  --color-rose-light:   #D4877F;
+  --color-apricot:      #C9965A;
+  --color-sage:         #2F5C31;
+  --color-cream:        #FAF8F4;
+  --color-blush:        #F5E9E7;
+  --color-rose-bg:      #F5E9E7;
+  --color-text-primary:   #1A1A17;
+  --color-text-secondary: #5C5C56;
+  --color-text-muted:     #9A9A92;
+
+  /* New floral design tokens */
+  --color-floral-green:       #1D3A1E;
+  --color-floral-green-mid:   #2F5C31;
+  --color-floral-green-light: #E8EDE8;
+  --color-floral-rose:        #B55C52;
+  --color-floral-rose-light:  #F5E9E7;
+  --color-floral-gold:        #C9965A;
+  --color-floral-bg:          #FAF8F4;
+  --color-floral-bg-alt:      #F0EBE3;
+  --color-floral-border:      #DED8CF;
+  --color-floral-white:       #FFFFFF;
 }
 
 body {
-  font-family: 'Noto Sans TC', sans-serif;
-  background-color: var(--color-cream);
-  color: var(--color-text-primary);
+  font-family: 'Funnel Sans', 'Noto Sans TC', sans-serif;
+  background-color: #FAF8F4;
+  color: #1A1A17;
+}
+
+.font-serif-display {
+  font-family: 'Playfair Display', 'Noto Serif TC', serif;
 }

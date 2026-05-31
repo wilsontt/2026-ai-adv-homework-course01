@@ -1,26 +1,33 @@
-<header class="sticky top-0 z-50 bg-white shadow-sm border-b border-rose-bg">
-  <div class="max-w-7xl mx-auto flex items-center justify-between px-4 h-16">
-    <a href="/" class="text-xl font-bold text-rose-primary" style="font-family: 'Noto Serif TC', serif;">
-      花漾生活
+<header class="sticky top-0 z-50 bg-white border-b border-floral-border" style="height:72px;">
+  <div class="max-w-7xl mx-auto h-full flex items-center justify-between px-8">
+
+    <!-- Logo -->
+    <a href="/" class="flex flex-col leading-none gap-0.5">
+      <span class="text-[9px] font-semibold tracking-[0.22em] text-text-muted uppercase">FLORAL STUDIO</span>
+      <span class="text-xl font-bold text-floral-green font-serif-display">花漾生活</span>
     </a>
 
-    <nav class="flex items-center gap-6 text-sm text-text-secondary">
-      <a href="/" class="hover:text-rose-primary transition-colors">商品列表</a>
-      <a href="/cart" class="hover:text-rose-primary transition-colors relative">
-        購物車
-        <span
-          id="cart-badge"
-          class="absolute -top-2 -right-4 bg-rose-primary text-white text-xs rounded-full w-5 h-5 items-center justify-center"
-          style="display: none;"
-        ></span>
-      </a>
-      <a id="orders-link" href="/orders" class="hover:text-rose-primary transition-colors" style="display: none;">
-        我的訂單
-      </a>
+    <!-- Nav -->
+    <nav class="hidden md:flex items-center gap-10 text-sm text-text-secondary">
+      <a href="/" class="hover:text-floral-green transition-colors">首頁</a>
+      <a href="/#products" class="hover:text-floral-green transition-colors">花藝商品</a>
+      <a href="/" class="hover:text-floral-green transition-colors">關於我們</a>
+      <a id="orders-link" href="/orders" class="hover:text-floral-green transition-colors" style="display:none;">我的訂單</a>
     </nav>
 
-    <div id="auth-nav" class="flex items-center gap-4 text-sm">
-      <a href="/login" class="bg-rose-primary text-white px-4 py-1.5 rounded-full hover:bg-rose-dark transition-colors">登入</a>
+    <!-- Auth + Cart -->
+    <div class="flex items-center gap-5">
+      <div id="auth-nav" class="flex items-center gap-4 text-sm text-text-secondary">
+        <a href="/login" class="hover:text-floral-green transition-colors">登入</a>
+      </div>
+      <a href="/cart" class="relative flex items-center gap-2 bg-floral-green text-white text-sm font-medium px-4 py-2 rounded hover:bg-floral-green-mid transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+        </svg>
+        購物車
+        <span id="cart-badge" class="absolute -top-1.5 -right-1.5 bg-floral-rose text-white text-[10px] rounded-full w-5 h-5 items-center justify-center font-bold" style="display:none;"></span>
+      </a>
     </div>
+
   </div>
 </header>

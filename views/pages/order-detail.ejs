@@ -1,116 +1,152 @@
 <div id="app" data-order-id="<%= orderId %>" data-payment-result="<%= paymentResult %>">
-  <h1 class="text-2xl font-bold text-text-primary mb-6" style="font-family: 'Noto Serif TC', serif;">訂單詳情</h1>
 
-  <div v-if="loading" class="flex justify-center py-12">
-    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  <div v-if="loading" class="flex justify-center py-24">
+    <span class="w-8 h-8 border-2 border-floral-green border-t-transparent rounded-full animate-spin inline-block"></span>
   </div>
 
   <template v-else-if="order">
-    <!-- Payment Result Alert -->
-    <div
-      v-if="paymentResult && paymentMessages[paymentResult]"
-      class="rounded-xl p-4 mb-6 text-sm"
-      :class="paymentMessages[paymentResult].cls"
-    >
-      {{ paymentMessages[paymentResult].text }}
-    </div>
+    <div class="max-w-7xl mx-auto px-8 py-10">
 
-    <!-- Order Info -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <div class="flex items-start justify-between">
+      <!-- Title Row -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
-          <p class="text-sm text-text-secondary">訂單編號：{{ order.order_no }}</p>
-          <p class="text-xs text-text-muted mt-1">建立日期：{{ new Date(order.created_at).toLocaleDateString('zh-TW') }}</p>
+          <h1 class="font-serif-display font-bold text-4xl text-text-primary mb-1">訂單詳情</h1>
+          <p class="text-text-muted text-sm">訂單編號：{{ order.order_no }}</p>
         </div>
         <span
-          class="text-xs px-3 py-1 rounded-full font-medium"
+          class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded w-fit"
           :class="statusMap[order.status]?.cls || 'bg-gray-100 text-gray-600'"
         >
+          <span class="w-2 h-2 rounded-full bg-current opacity-70"></span>
           {{ statusMap[order.status]?.label || order.status }}
         </span>
       </div>
-    </div>
 
-    <!-- Recipient Info -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <h2 class="font-medium text-text-primary mb-3">收件資訊</h2>
-      <div class="text-sm space-y-2 text-text-secondary">
-        <p>收件人：{{ order.recipient_name }}</p>
-        <p>Email：{{ order.recipient_email }}</p>
-        <p>地址：{{ order.recipient_address }}</p>
-      </div>
-    </div>
-
-    <!-- Order Items -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <h2 class="font-medium text-text-primary mb-3">商品明細</h2>
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-gray-100 text-text-muted">
-            <th class="text-left py-2 font-normal">商品名稱</th>
-            <th class="text-right py-2 font-normal">單價</th>
-            <th class="text-right py-2 font-normal">數量</th>
-            <th class="text-right py-2 font-normal">小計</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in order.items" :key="item.id" class="border-b border-gray-50">
-            <td class="py-3 text-text-primary">{{ item.product_name }}</td>
-            <td class="py-3 text-right text-text-secondary">NT$ {{ item.product_price.toLocaleString() }}</td>
-            <td class="py-3 text-right text-text-secondary">{{ item.quantity }}</td>
-            <td class="py-3 text-right text-text-primary font-medium">NT$ {{ (item.product_price * item.quantity).toLocaleString() }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3" class="pt-3 text-right font-bold text-text-primary">總計</td>
-            <td class="pt-3 text-right font-bold text-rose-primary text-lg">NT$ {{ order.total_amount.toLocaleString() }}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-
-    <!-- Payment Buttons -->
-    <div v-if="order.status === 'pending'" class="space-y-4">
-      <!-- ECPay 付款 -->
-      <div class="flex gap-4">
-        <button
-          @click="handleEcpay"
-          :disabled="paying || querying"
-          class="bg-sage text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-sage/90 transition-colors disabled:opacity-50"
-        >
-          {{ paying ? '導向付款頁面中...' : '前往付款' }}
-        </button>
-        <button
-          v-if="paymentResult === 'callback' || paymentResult === null"
-          @click="handleQueryPayment"
-          :disabled="querying || paying"
-          class="bg-white text-sage border border-sage px-8 py-3 rounded-full text-sm font-medium hover:bg-sage/5 transition-colors disabled:opacity-50"
-        >
-          {{ querying ? '查詢中...' : '查詢付款結果' }}
-        </button>
+      <!-- Payment Result Alert -->
+      <div
+        v-if="paymentResult && paymentMessages[paymentResult]"
+        class="rounded-lg px-5 py-4 mb-6 text-sm border-l-4 flex items-center gap-3"
+        :class="paymentMessages[paymentResult].cls"
+      >
+        <span class="text-lg">{{ paymentResult === 'success' ? '✓' : paymentResult === 'querying' ? '↻' : '✕' }}</span>
+        {{ paymentMessages[paymentResult].text }}
       </div>
 
-      <!-- 模擬付款（開發用） -->
-      <details class="text-xs text-text-muted">
-        <summary class="cursor-pointer hover:text-text-secondary">DEV: 模擬付款</summary>
-        <div class="flex gap-3 mt-2">
-          <button
-            @click="handlePaySuccess"
-            :disabled="paying"
-            class="border border-gray-300 text-gray-500 px-4 py-1.5 rounded-full text-xs hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            模擬成功
-          </button>
-          <button
-            @click="handlePayFail"
-            :disabled="paying"
-            class="border border-gray-300 text-gray-500 px-4 py-1.5 rounded-full text-xs hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            模擬失敗
-          </button>
+      <div class="flex flex-col lg:flex-row gap-8 items-start">
+
+        <!-- Left Column -->
+        <div class="flex-1 min-w-0 flex flex-col gap-6">
+
+          <!-- Recipient Info -->
+          <div class="bg-white rounded-lg border border-floral-border overflow-hidden">
+            <div class="px-6 py-4 border-b border-floral-border">
+              <h2 class="font-serif-display font-bold text-lg text-text-primary">收件資訊</h2>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-text-muted text-xs mb-1">收件人</p>
+                <p class="font-medium text-text-primary">{{ order.recipient_name }}</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs mb-1">電子郵件</p>
+                <p class="font-medium text-text-primary">{{ order.recipient_email }}</p>
+              </div>
+              <div class="sm:col-span-2">
+                <p class="text-text-muted text-xs mb-1">收件地址</p>
+                <p class="font-medium text-text-primary">{{ order.recipient_address }}</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs mb-1">訂單建立</p>
+                <p class="font-medium text-text-primary">{{ new Date(order.created_at).toLocaleString('zh-TW') }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Items -->
+          <div class="bg-white rounded-lg border border-floral-border overflow-hidden">
+            <div class="px-6 py-4 border-b border-floral-border">
+              <h2 class="font-serif-display font-bold text-lg text-text-primary">商品明細</h2>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="bg-floral-bg-alt">
+                    <th class="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wide">商品名稱</th>
+                    <th class="text-right py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wide">單價</th>
+                    <th class="text-right py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wide">數量</th>
+                    <th class="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wide">小計</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-floral-border">
+                  <tr v-for="item in order.items" :key="item.id" class="hover:bg-floral-bg-alt/40 transition-colors">
+                    <td class="py-4 px-6 font-medium text-text-primary">{{ item.product_name }}</td>
+                    <td class="py-4 px-4 text-right text-text-secondary">NT${{ item.product_price.toLocaleString() }}</td>
+                    <td class="py-4 px-4 text-right text-text-secondary">{{ item.quantity }}</td>
+                    <td class="py-4 px-6 text-right font-semibold text-text-primary">NT${{ (item.product_price * item.quantity).toLocaleString() }}</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="border-t-2 border-floral-border bg-floral-bg-alt/50">
+                    <td colspan="3" class="py-4 px-6 text-right font-bold text-text-primary">訂單總計</td>
+                    <td class="py-4 px-6 text-right font-bold text-floral-rose text-xl font-serif-display">NT${{ order.total_amount.toLocaleString() }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- Payment Actions (only for pending) -->
+          <div v-if="order.status === 'pending'" class="flex flex-col gap-3">
+            <div class="flex gap-3">
+              <button
+                @click="handleEcpay"
+                :disabled="paying || querying"
+                class="flex items-center gap-2 bg-floral-green text-white font-semibold px-8 py-3 rounded text-sm hover:bg-floral-green-mid transition-colors disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                {{ paying ? '導向付款頁面中…' : '前往付款' }}
+              </button>
+              <button
+                v-if="paymentResult === 'callback' || paymentResult === null"
+                @click="handleQueryPayment"
+                :disabled="querying || paying"
+                class="flex items-center gap-2 border border-floral-green text-floral-green font-semibold px-8 py-3 rounded text-sm hover:bg-floral-green-light transition-colors disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                {{ querying ? '查詢中…' : '查詢付款結果' }}
+              </button>
+            </div>
+            <!-- DEV: Simulate payment -->
+            <details class="text-xs text-text-muted">
+              <summary class="cursor-pointer hover:text-text-secondary select-none">DEV：模擬付款</summary>
+              <div class="flex gap-2 mt-2">
+                <button @click="handlePaySuccess" :disabled="paying" class="border border-floral-border text-text-secondary px-4 py-1.5 rounded text-xs hover:bg-floral-green-light transition-colors disabled:opacity-50">模擬成功</button>
+                <button @click="handlePayFail" :disabled="paying" class="border border-floral-border text-text-secondary px-4 py-1.5 rounded text-xs hover:bg-floral-rose-light transition-colors disabled:opacity-50">模擬失敗</button>
+              </div>
+            </details>
+          </div>
+
         </div>
-      </details>
+
+        <!-- Right Column: Back button -->
+        <div class="w-full lg:w-64 flex-shrink-0 flex flex-col gap-4">
+          <a
+            href="/orders"
+            class="flex items-center gap-2 text-sm text-text-secondary border border-floral-border bg-white rounded-lg px-5 py-3 hover:bg-floral-green-light transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            返回訂單列表
+          </a>
+          <a
+            href="/"
+            class="flex items-center justify-center gap-2 text-sm font-semibold bg-floral-green text-white rounded-lg px-5 py-3 hover:bg-floral-green-mid transition-colors"
+          >
+            繼續購物
+          </a>
+        </div>
+
+      </div>
     </div>
   </template>
+
 </div>
